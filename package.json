@@ -1,0 +1,29 @@
+{
+  "name": "nodejs-ws-lab",
+  "version": "0.0.1",
+  "description": "Basic nodejs websocket application",
+  "main": "index.js",
+  "scripts": {
+    "prestart": "rimraf public",
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uofa-cmput404/nodejs-ws-lab.git"
+  },
+  "author": "Alexander Wong <alex.wong@ualberta.ca>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/uofa-cmput404/nodejs-ws-lab/issues"
+  },
+  "homepage": "https://github.com/uofa-cmput404/nodejs-ws-lab#readme",
+  "dependencies": {
+    "debug": "^4.1.1",
+    "express": "^4.16.4",
+    "parcel-bundler": "^1.11.0",
+    "phaser": "^3.16.2",
+    "rimraf": "^2.6.3",
+    "ws": "^6.1.4"
+  }
+}
