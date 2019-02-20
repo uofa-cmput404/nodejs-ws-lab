@@ -8,12 +8,19 @@ interface ICoords {
   y: number;
 }
 
+const DEBUG = false; // Render debug physics entities
+
 class GameScene extends Phaser.Scene {
   private HOST = window.location.hostname; // localhost and 127.0.0.1 handled
   private PORT = 8080; // change this if needed
 
+  private VELOCITY = 100;
   private wsClient?: WebSocket;
-  private sprite?: Phaser.GameObjects.Sprite;
+  private player?: Phaser.GameObjects.Sprite;
+  private leftKey?: Phaser.Input.Keyboard.Key;
+  private rightKey?: Phaser.Input.Keyboard.Key;
+  private upKey?: Phaser.Input.Keyboard.Key;
+  private downKey?: Phaser.Input.Keyboard.Key;
 
   constructor() { super({ key: "GameScene" }); }
 
@@ -21,7 +28,11 @@ class GameScene extends Phaser.Scene {
    * Load the assets required by the scene
    */
   public preload() {
-    this.load.image("bunny", "static/bunny.png");
+    this.load.tilemapCSV("map", "static/level_map.csv");
+    this.load.image("tiles", "static/tiles_16.png");
+    this.load.spritesheet("player", "static/spaceman.png", {
+      frameWidth: 16, frameHeight: 16
+    });
   }
 
   /**
@@ -30,49 +41,10 @@ class GameScene extends Phaser.Scene {
   public init() {
     // Initialize the websocket client
     this.wsClient = new WebSocket(`ws://${this.HOST}:${this.PORT}`);
-    this.wsClient.onopen = (event) => {
-      // After the websocket is open, set interactivtiy
-      console.log(event);
-
-      // Start of the drag event (mouse click down)
-      this.input.on("dragstart", (
-        _: Phaser.Input.Pointer,
-        gObject: Phaser.GameObjects.Sprite
-      ) => {
-        gObject.setTint(0xff0000);
-      });
-
-      // During the drag event (mouse movement)
-      this.input.on("drag", (
-        _: Phaser.Input.Pointer,
-        gObject: Phaser.GameObjects.Sprite,
-        dragX: number,
-        dragY: number
-      ) => {
-        gObject.x = dragX;
-        gObject.y = dragY;
-        this.wsClient!.send(JSON.stringify({ x: gObject.x, y: gObject.y }));
-      });
-
-      // End of the drag event (mouse click up)
-      this.input.on("dragend", (
-        _: Phaser.Input.Pointer,
-        gObject: Phaser.GameObjects.Sprite
-      ) => {
-        gObject.clearTint();
-        this.wsClient!.send(JSON.stringify({ x: gObject.x, y: gObject.y }));
-      });
-    }
-
+    this.wsClient.onopen = (event) => console.log(event);
+    // TODO: multiplayer functionality
     this.wsClient.onmessage = (wsMsgEvent) => {
-      console.log(wsMsgEvent);
-      wsMsgEvent.data;
-      const actorCoordinates: ICoords = JSON.parse(wsMsgEvent.data);
-      // Sprite may not have been initialized yet
-      if (this.sprite) {
-        this.sprite.x = actorCoordinates.x;
-        this.sprite.y = actorCoordinates.y;
-      }
+      console.log(wsMsgEvent)
     }
   }
 
@@ -80,10 +52,87 @@ class GameScene extends Phaser.Scene {
    * Create the game objects required by the scene
    */
   public create() {
-    // Create an interactive, draggable bunny sprite
-    this.sprite = this.add.sprite(100, 100, "bunny");
-    this.sprite.setInteractive();
-    this.input.setDraggable(this.sprite);
+    // Create the TileMap and the Layer
+    const tileMap = this.add.tilemap("map", 16, 16);
+    tileMap.addTilesetImage("tiles");
+    const layer = tileMap.createDynamicLayer("layer", "tiles", 0, 0);
+    tileMap.setCollisionBetween(54, 83);
+    if (DEBUG) {
+      layer.renderDebug(this.add.graphics(), {});
+    }
+
+    // Player animations
+    this.anims.create({
+      key: "left",
+      frames: this.anims.generateFrameNumbers("player", { start: 8, end: 9 }),
+      frameRate: 10,
+      repeat: -1
+    });
+    this.anims.create({
+      key: "right",
+      frames: this.anims.generateFrameNumbers("player", { start: 1, end: 2 }),
+      frameRate: 10,
+      repeat: -1
+    });
+    this.anims.create({
+      key: "up",
+      frames: this.anims.generateFrameNumbers("player", { start: 11, end: 13 }),
+      frameRate: 10,
+      repeat: -1
+    });
+    this.anims.create({
+      key: "down",
+      frames: this.anims.generateFrameNumbers("player", { start: 4, end: 6 }),
+      frameRate: 10,
+      repeat: -1
+    });
+
+    // Player game object
+    this.player = this.physics.add.sprite(48, 48, "player", 1);
+    this.physics.add.collider(this.player, layer);
+    this.cameras.main.startFollow(this.player);
+    this.cameras.main.setBounds(
+      0, 0, tileMap.widthInPixels, tileMap.heightInPixels
+    );
+
+    // Keyboard input bindings
+    this.leftKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
+    this.rightKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
+    this.upKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
+    this.downKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
+  }
+
+  public update() {
+    if (this.player) {
+      let moving = false;
+      if (this.leftKey && this.leftKey.isDown) {
+        (this.player.body as Phaser.Physics.Arcade.Body).setVelocityX(-this.VELOCITY);
+        this.player.play("left", true);
+        moving = true;
+      } else if (this.rightKey && this.rightKey.isDown) {
+        (this.player.body as Phaser.Physics.Arcade.Body).setVelocityX(this.VELOCITY);
+        this.player.play("right", true);
+        moving = true;
+      } else {
+        (this.player.body as Phaser.Physics.Arcade.Body).setVelocityX(0);
+      }
+      if (this.upKey && this.upKey.isDown) {
+        (this.player.body as Phaser.Physics.Arcade.Body).setVelocityY(-this.VELOCITY);
+        this.player.play("up", true);
+        moving = true;
+      } else if (this.downKey && this.downKey.isDown) {
+        (this.player.body as Phaser.Physics.Arcade.Body).setVelocityY(this.VELOCITY);
+        this.player.play("down", true);
+        moving = true;
+      } else {
+        (this.player.body as Phaser.Physics.Arcade.Body).setVelocityY(0);
+      }
+      if (!moving) {
+        (this.player.body as Phaser.Physics.Arcade.Body).setVelocity(0);
+        this.player.anims.stop();
+      }
+      this.player.update();
+    }
   }
 }
 
@@ -93,8 +142,14 @@ const config: GameConfig = {
   type: Phaser.AUTO,
   width: 800,
   height: 500,
-  scene: [GameScene]
-};
+  scene: [GameScene],
+  input: { keyboard: true },
+  physics: {
+    default: "arcade",
+    arcade: { debug: DEBUG }
+  },
+  render: { pixelArt: true, antialias: false }
+}
 
 class LabDemoGame extends Phaser.Game {
   constructor(config: GameConfig) {
@@ -104,4 +159,4 @@ class LabDemoGame extends Phaser.Game {
 
 window.addEventListener("load", () => {
   new LabDemoGame(config);
-})
+});
