@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const WebSocketServer = require("ws").Server;
+const { Server: WebSocketServer } = require("ws");
 const express = require("express");
 const http = require("http");
 const ParcelBundler = require("parcel-bundler");
@@ -28,7 +28,7 @@ function bundleClient() {
  * Setup a quick Web Socket server
  */
 function setupWSServer(server) {
-  const wss = new WebSocketServer({ 
+  const wss = new WebSocketServer({
     server,
     autoAcceptConnections: false
   });

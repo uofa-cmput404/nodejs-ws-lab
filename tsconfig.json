@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "es2016",
+    "module": "commonjs",
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true
+  },
+  "files": [
+    "client.ts",
+    "node_modules/phaser3-docs/typescript/phaser.d.ts"
+  ]
+}
