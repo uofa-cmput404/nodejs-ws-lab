@@ -1,8 +1,9 @@
-// This is browser code that gets transformed using Babel
+// This is browser code that gets transformed using Parcel/Babel
 // Therefore you can now use ES6 style imports
 
 import Phaser from "phaser";
 
+const HOST = window.location.hostname; // localhost and 127.0.0.1 handled
 const PORT = 8080; // change this if needed
 
 /**
@@ -21,9 +22,25 @@ function create() {
   sprite.setInteractive();
 
   // Initialize the websocket client
-  const wsClient = new WebSocket(`ws://localhost:${PORT}`);
+  const wsClient = new WebSocket(`ws://${HOST}:${PORT}`);
   wsClient.onopen = (event) => {
+    // After the websocket is open, set interactivtiy
     console.log(event);
+
+    // Make the game handle draggable bunny sprite
+    this.input.setDraggable(sprite);
+    this.input.on("dragstart", (_, gameObject) => {
+      gameObject.setTint(0xff0000);
+    });
+    this.input.on("drag", (_, gameObject, dragX, dragY) => {
+      gameObject.x = dragX;
+      gameObject.y = dragY;
+      // wsClient.send(JSON.stringify({ x: gameObject.x, y: gameObject.y }));
+    });
+    this.input.on("dragend", (_, gameObject) => {
+      gameObject.clearTint();
+      wsClient.send(JSON.stringify({ x: gameObject.x, y: gameObject.y }));
+    });
   }
   wsClient.onmessage = (event) => {
     console.log(event);
@@ -31,29 +48,13 @@ function create() {
     sprite.x = actorCoordinates.x;
     sprite.y = actorCoordinates.y;
   };
-
-  // Make the game handle draggable bunny sprite
-  this.input.setDraggable(sprite);
-  this.input.on("dragstart", (_, gameObject) => {
-    gameObject.setTint(0xff0000);
-  });
-  this.input.on("drag", (_, gameObject, dragX, dragY) => {
-    gameObject.x = dragX;
-    gameObject.y = dragY;
-  });
-  this.input.on("dragend", (_, gameObject) => {
-    gameObject.clearTint();
-    wsClient.send(JSON.stringify({ x: gameObject.x, y: gameObject.y }));
-  });
 }
 
-
+// Phaser configuration variables
 const config = {
   type: Phaser.AUTO,
   width: 800,
   height: 500,
-  scene: {
-    preload, create
-  }
+  scene: { preload, create }
 };
-const game = new Phaser.Game(config);
+new Phaser.Game(config);
