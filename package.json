@@ -21,11 +21,11 @@
   "dependencies": {
     "debug": "^4.1.1",
     "express": "^4.16.4",
-    "parcel-bundler": "^1.11.0",
+    "parcel-bundler": "1.12.3",
     "phaser": "^3.16.2",
-    "rimraf": "^2.6.3",
-    "typescript": "^3.3.3",
-    "ws": "^6.1.4"
+    "rimraf": "^3.0.2",
+    "typescript": "^4.2.3",
+    "ws": "^7.4.4"
   },
   "devDependencies": {
     "phaser3-docs": "git+https://github.com/uofa-cmput404/phaser3-docs.git"
