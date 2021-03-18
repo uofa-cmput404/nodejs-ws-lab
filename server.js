@@ -5,7 +5,7 @@ const express = require("express");
 const http = require("http");
 const ParcelBundler = require("parcel-bundler");
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8081;
 const PUBLIC_DIR = "public";
 const STATIC_DIR = "static";
 
@@ -32,13 +32,16 @@ function setupWSServer(server) {
     server,
     autoAcceptConnections: false
   });
-  let actorCoordinates = { x: 100, y: 100 };
+  let actorCoordinates = { };
   wss.on("connection", (ws) => {
     ws.on("message", (rawMsg) => {
       console.log(`RECV: ${rawMsg}`);
       const incommingMessage = JSON.parse(rawMsg);
-      actorCoordinates.x = incommingMessage.x;
-      actorCoordinates.y = incommingMessage.y;
+      actorCoordinates[incommingMessage.id] = {
+        x: incommingMessage.x,
+        y: incommingMessage.y,
+        frame: incommingMessage.frame
+      }
       wss.clients.forEach((wsClient) => {
         wsClient.send(JSON.stringify(actorCoordinates));
       })
