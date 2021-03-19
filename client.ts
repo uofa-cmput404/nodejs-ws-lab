@@ -3,9 +3,35 @@
 
 import * as Phaser from "phaser";
 
+function uuid(
+  a?: any               // placeholder
+): string {
+  return a              // if the placeholder was passed, return
+    ? (                 // a random number from 0 to 15
+      a ^               // unless b is 8,
+      Math.random()     // in which case
+      * 16              // a random number from
+      >> a / 4          // 8 to 11
+    ).toString(16)      // in hexadecimal
+    : (                 // or otherwise a concatenated string:
+      1e7.toString() +  // 10000000 +
+      -1e3 +            // -1000 +
+      -4e3 +            // -4000 +
+      -8e3 +            // -80000000 +
+      -1e11             // -100000000000,
+    ).replace(          // replacing
+      /[018]/g,         // zeroes, ones, and eights with
+      uuid              // random hex digits
+    )
+}
+
+
 interface ICoords {
-  x: number;
-  y: number;
+  [key: string]: {
+    x: number;
+    y: number;
+    frame: number;
+  }
 }
 
 const DEBUG = false; // Render debug physics entities
@@ -16,7 +42,8 @@ class GameScene extends Phaser.Scene {
 
   private VELOCITY = 100;
   private wsClient?: WebSocket;
-  private player?: Phaser.GameObjects.Sprite;
+  private id = uuid();
+  private players: {[key: string]: Phaser.GameObjects.Sprite} = {};
   private leftKey?: Phaser.Input.Keyboard.Key;
   private rightKey?: Phaser.Input.Keyboard.Key;
   private upKey?: Phaser.Input.Keyboard.Key;
@@ -44,7 +71,30 @@ class GameScene extends Phaser.Scene {
     this.wsClient.onopen = (event) => console.log(event);
     // TODO: multiplayer functionality
     this.wsClient.onmessage = (wsMsgEvent) => {
-      console.log(wsMsgEvent)
+      const allCoords: ICoords = JSON.parse(wsMsgEvent.data);
+        for (const playerId of Object.keys(allCoords)) {
+          if (playerId === this.id) {
+            // we don't need to update ourselves
+            continue;
+          }
+          const { x, y, frame } = allCoords[playerId];
+          if (playerId in this.players) {
+            // We have seen this player before, update it!
+            const player = this.players[playerId];
+            if (player.texture.key === "__MISSING") {
+              // Player was instantiated before texture was ready, reinstantiate
+              player.destroy();
+              this.players[playerId] = this.add.sprite(x, y, "player", frame);
+            } else {
+              player.setX(x);
+              player.setY(y);
+              player.setFrame(frame);
+            }
+          } else {
+            // We have not seen this player before, create it!
+            this.players[playerId] = this.add.sprite(x, y, "player", frame);
+          }
+        }
     }
   }
 
@@ -88,9 +138,9 @@ class GameScene extends Phaser.Scene {
     });
 
     // Player game object
-    this.player = this.physics.add.sprite(48, 48, "player", 1);
-    this.physics.add.collider(this.player, layer);
-    this.cameras.main.startFollow(this.player);
+    this.players[this.id] = this.physics.add.sprite(48, 48, "player", 1);
+    this.physics.add.collider(this.players[this.id], layer);
+    this.cameras.main.startFollow(this.players[this.id]);
     this.cameras.main.setBounds(
       0, 0, tileMap.widthInPixels, tileMap.heightInPixels
     );
@@ -103,35 +153,53 @@ class GameScene extends Phaser.Scene {
   }
 
   public update() {
-    if (this.player) {
+    for (const playerId of Object.keys(this.players)) {
+        const player = this.players[playerId];
+
+        if (playerId !== this.id) {
+          player.setTint(0x0000aa); // so we can tell our guy apart
+          player.update();
+          continue;
+        }
+
+      }
+
+      if (this.players[this.id]) {
       let moving = false;
       if (this.leftKey && this.leftKey.isDown) {
-        (this.player.body as Phaser.Physics.Arcade.Body).setVelocityX(-this.VELOCITY);
-        this.player.play("left", true);
+        (this.players[this.id].body as Phaser.Physics.Arcade.Body).setVelocityX(-this.VELOCITY);
+        this.players[this.id].play("left", true);
         moving = true;
       } else if (this.rightKey && this.rightKey.isDown) {
-        (this.player.body as Phaser.Physics.Arcade.Body).setVelocityX(this.VELOCITY);
-        this.player.play("right", true);
+        (this.players[this.id].body as Phaser.Physics.Arcade.Body).setVelocityX(this.VELOCITY);
+        this.players[this.id].play("right", true);
         moving = true;
       } else {
-        (this.player.body as Phaser.Physics.Arcade.Body).setVelocityX(0);
+        (this.players[this.id].body as Phaser.Physics.Arcade.Body).setVelocityX(0);
       }
       if (this.upKey && this.upKey.isDown) {
-        (this.player.body as Phaser.Physics.Arcade.Body).setVelocityY(-this.VELOCITY);
-        this.player.play("up", true);
+        (this.players[this.id].body as Phaser.Physics.Arcade.Body).setVelocityY(-this.VELOCITY);
+        this.players[this.id].play("up", true);
         moving = true;
       } else if (this.downKey && this.downKey.isDown) {
-        (this.player.body as Phaser.Physics.Arcade.Body).setVelocityY(this.VELOCITY);
-        this.player.play("down", true);
+        (this.players[this.id].body as Phaser.Physics.Arcade.Body).setVelocityY(this.VELOCITY);
+        this.players[this.id].play("down", true);
         moving = true;
       } else {
-        (this.player.body as Phaser.Physics.Arcade.Body).setVelocityY(0);
+        (this.players[this.id].body as Phaser.Physics.Arcade.Body).setVelocityY(0);
       }
       if (!moving) {
-        (this.player.body as Phaser.Physics.Arcade.Body).setVelocity(0);
-        this.player.anims.stop();
+        (this.players[this.id].body as Phaser.Physics.Arcade.Body).setVelocity(0);
+        this.players[this.id].anims.stop();
+      } else if (this.wsClient) {
+        this.wsClient.send(JSON.stringify({
+          id: this.id,
+          x: this.players[this.id].x,
+          y: this.players[this.id].y,
+          frame: this.players[this.id].frame.name
+        }));
       }
-      this.player.update();
+      this.players[this.id].update();
     }
   }
 }
