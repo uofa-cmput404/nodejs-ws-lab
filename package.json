@@ -20,7 +20,7 @@
   "homepage": "https://github.com/uofa-cmput404/nodejs-ws-lab#readme",
   "dependencies": {
     "debug": "^4.1.1",
-    "express": "^4.16.4",
+    "express": "^4.18.2",
     "parcel-bundler": "1.12.3",
     "phaser": "^3.16.2",
     "rimraf": "^3.0.2",
